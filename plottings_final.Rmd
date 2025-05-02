@@ -1,0 +1,259 @@
+---
+title: "plottings_final"
+output: html_document
+date: "2025-05-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(readr)
+merged_df <- read_csv("~/Desktop/2020_data/Merged_Results_Data.csv") 
+```
+
+
+```{r boxplot-n250-final, fig.height=10, fig.width=10}
+df_250 <- merged_df %>% filter(sample_size == 250)
+df_250$effect_type <- factor(df_250$effect_type, levels = c("heterogeneous", "homogeneous"))
+df_250$mu_type <- factor(df_250$mu_type, levels = c("linear", "nonlinear"))
+
+model_colors <- c("BART" = "#E69F00", "BCF" = "#56B4E9", "Horseshoe" = "#009E73")
+
+agg_annot <- df_250 %>%
+  group_by(Model, effect_type, mu_type) %>%
+  summarize(
+    interval = round(mean(interval_length), 2),
+    cover = round(mean(coverage), 2),
+    sd_rmse = round(sd(rmse), 3),
+    .groups = "drop"
+  ) %>%
+  mutate(label = paste0("Len: ", interval,
+                        "\nCov: ", cover,
+                        "\nSD: ", sd_rmse))
+
+p1 <- ggplot(df_250, aes(x = Model, y = rmse, fill = Model)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  facet_grid(mu_type ~ effect_type) +
+  geom_text(data = agg_annot, aes(x = Model, y = 3.4, label = label),
+            size = 4, color = "black") +
+  scale_fill_manual(values = model_colors) +
+  labs(title = "RMSE (ATE) for n = 250",
+       y = "RMSE",
+       x = NULL) +
+  coord_cartesian(ylim = c(0, 3.6)) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 14),
+    panel.spacing = unit(1.5, "lines"),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  )
+
+ggsave(filename = "~/Desktop/2020_data/rmse_boxplot_n250.png",
+       plot = p1, width = 10, height = 10, dpi = 300, bg = "white")
+```
+
+
+```{r rmse-hist-n250, fig.height=10, fig.width=10}
+library(ggplot2)
+library(dplyr)
+
+# Filter for n = 250
+df_250 <- merged_df %>% filter(sample_size == 250)
+df_250$effect_type <- factor(df_250$effect_type, levels = c("heterogeneous", "homogeneous"))
+df_250$mu_type <- factor(df_250$mu_type, levels = c("linear", "nonlinear"))
+
+# Set new model colors
+model_colors <- c(
+  "BART" = "#E69F00",
+  "BCF" = "#56B4E9",
+  "Horseshoe" = "#009E73"
+)
+
+# Plot
+p_hist <- ggplot(df_250, aes(x = rmse, fill = Model)) +
+  geom_histogram(bins = 20, alpha = 0.8, position = "identity", color = "black") +
+  facet_grid(mu_type ~ effect_type) +
+  scale_fill_manual(values = model_colors) +
+  labs(title = "Histogram of RMSE (ATE) for n = 250",
+       x = "RMSE for ATE",
+       y = "Count") +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 14),
+    legend.title = element_blank(),
+    legend.position = "top",
+    panel.spacing = unit(1.5, "lines")
+  )
+
+# Print
+print(p_hist)
+
+# Save
+ggsave(
+  filename = "~/Desktop/2020_data/rmse_histogram_n250.png",
+  plot = p_hist,
+  width = 10,
+  height = 10,
+  dpi = 300,
+  bg = "white"
+)
+```
+```{r boxplot-n500, fig.height=10, fig.width=10}
+library(ggplot2)
+library(dplyr)
+
+# Filter for sample size = 500
+df_500 <- merged_df %>% filter(sample_size == 500)
+df_500$effect_type <- factor(df_500$effect_type, levels = c("heterogeneous", "homogeneous"))
+df_500$mu_type <- factor(df_500$mu_type, levels = c("linear", "nonlinear"))
+
+# Use the same new colors
+model_colors <- c(
+  "BART" = "#E69F00",
+  "BCF" = "#56B4E9",
+  "Horseshoe" = "#009E73"
+)
+
+# Create annotation stats
+agg_annot_500 <- df_500 %>%
+  group_by(Model, effect_type, mu_type) %>%
+  summarize(
+    interval = round(mean(interval_length), 2),
+    cover = round(mean(coverage), 2),
+    sd_rmse = round(sd(rmse), 3),
+    .groups = "drop"
+  ) %>%
+  mutate(label = paste0("Len: ", interval,
+                        "\nCov: ", cover,
+                        "\nSD: ", sd_rmse))
+
+# Create plot
+p_box_500 <- ggplot(df_500, aes(x = Model, y = rmse, fill = Model)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  facet_grid(mu_type ~ effect_type) +
+  geom_text(data = agg_annot_500, aes(x = Model, y = 3.4, label = label),
+            size = 4, color = "black") +
+  scale_fill_manual(values = model_colors) +
+  labs(title = "RMSE (ATE) for n = 500",
+       y = "RMSE",
+       x = NULL) +
+  coord_cartesian(ylim = c(0, 3.6)) +
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(face = "bold", size = 14),
+    panel.spacing = unit(1.5, "lines"),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  )
+
+# Print the plot
+print(p_box_500)
+
+# Save to file
+ggsave(
+  filename = "~/Desktop/2020_data/rmse_boxplot_n500.png",
+  plot = p_box_500,
+  width = 10,
+  height = 10,
+  dpi = 300,
+  bg = "white"
+)
+```
+```{r rmse-hist-n500, fig.height=10, fig.width=10}
+library(ggplot2)
+library(dplyr)
+
+# Filter for sample size = 500
+df_500 <- merged_df %>% filter(sample_size == 500)
+df_500$effect_type <- factor(df_500$effect_type, levels = c("heterogeneous", "homogeneous"))
+df_500$mu_type <- factor(df_500$mu_type, levels = c("linear", "nonlinear"))
+
+# Model colors (same as previous)
+model_colors <- c(
+  "BART" = "#E69F00",
+  "BCF" = "#56B4E9",
+  "Horseshoe" = "#009E73"
+)
+
+# Plot
+p_hist_500 <- ggplot(df_500, aes(x = rmse, fill = Model)) +
+  geom_histogram(bins = 20, alpha = 0.8, position = "identity", color = "black") +
+  facet_grid(mu_type ~ effect_type) +
+  scale_fill_manual(values = model_colors) +
+  labs(title = "Histogram of RMSE (ATE) for n = 500",
+       x = "RMSE",
+       y = "Count") +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 14),
+    legend.title = element_blank(),
+    legend.position = "top",
+    panel.spacing = unit(1.5, "lines")
+  )
+
+# Print
+print(p_hist_500)
+
+# Save to file
+ggsave(
+  filename = "~/Desktop/2020_data/rmse_histogram_n500.png",
+  plot = p_hist_500,
+  width = 10,
+  height = 10,
+  dpi = 300,
+  bg = "white"
+)
+```
+```{r bcf-across-settings, fig.height=8, fig.width=12}
+library(ggplot2)
+library(dplyr)
+
+# Filter only BCF rows
+df_bcf <- merged_df %>% filter(Model == "BCF")
+df_bcf$effect_type <- factor(df_bcf$effect_type, levels = c("heterogeneous", "homogeneous"))
+df_bcf$mu_type <- factor(df_bcf$mu_type, levels = c("linear", "nonlinear"))
+
+# Faceted boxplot by setting
+p_bcf <- ggplot(df_bcf, aes(x = factor(sample_size), y = rmse, fill = factor(sample_size))) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  facet_grid(mu_type ~ effect_type) +
+  scale_fill_manual(values = c("250" = "#F8766D", "500" = "#00BFC4")) +
+  labs(title = "BCF RMSE (ATE) Across Settings",
+       x = "Sample Size",
+       y = "RMSE") +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 14),
+    legend.position = "none",
+    panel.spacing = unit(1.5, "lines"),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  )
+
+# Print
+print(p_bcf)
+
+# Save
+ggsave(
+  filename = "~/Desktop/2020_data/bcf_setting_boxplot.png",
+  plot = p_bcf,
+  width = 12,
+  height = 8,
+  dpi = 300,
+  bg = "white"
+)
+```
+
