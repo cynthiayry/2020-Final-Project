@@ -1,0 +1,178 @@
+---
+title: "DATA2020 Final Project"
+output: html_document
+date: "2025-04-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+# Required packages
+library(bcf)
+library(BART)
+library(mvtnorm)
+library(Metrics)
+```
+
+
+```{r}
+# data generating process
+
+generate_data = function(n, tau_type, mu_type, sigma) {
+  #' @param n Number of observations (rows in the dataset).
+  #' @param tau_type Type of tau. Can be either "homogeneous" or "heterogeneous".
+  #' @param mu_type Type of mu. Can be either "linear" or "nonlinear".
+  #' @param sigma Standard deviation of the error term.
+
+  x1 = rnorm(n, 0, 1)
+  x2 = rnorm(n, 0, 1)
+  x3 = rnorm(n, 0, 1)
+  x4 = rbinom(n, 1, 0.5)
+  x5 = sample(1:3, n, replace = TRUE)
+  g = 5 - 3 * x5
+  u = runif(n, 0, 1)
+  
+  # tau
+  if (tau_type == "homogeneous") {
+    tau = 3
+  } else if (tau_type == "heterogeneous") {
+    tau = 1 + 2 * x2 * x4
+  } else {
+    stop("tau_type can only be 'homogeneous' or 'heterogeneous'.")
+  }
+  
+  # mu
+  if (mu_type == "linear") {
+    mu = 1 + g + x1 * x3
+  } else if (mu_type == "nonlinear") {
+    mu = -6 + g + 6 * abs(x3 - 1)
+  } else {
+    stop("mu_type can only be 'linear' or 'nonlinear'.")
+  }
+  
+  s = sd(mu)
+  
+  # pi
+  pi = 0.8 * pnorm(3*mu/s-x1/2, 0, 1) + 0.05 + u / 10
+  
+  z = rbinom(n, 1, pi)
+  err = rnorm(n, 0, sigma)
+  y = mu + tau * z + err
+  
+  return(data.frame(y, z, x1, x2, x3, x4, x5, tau))
+}
+
+set.seed(2020)
+data = generate_data(250, "homogeneous", "linear", 0.1)
+head(data)
+```
+
+```{r}
+run_simulation <- function(n, tau_type, mu_type, sigma,
+                           n_sim = 20, iter = 800,
+                           results_file = "bcf_metrics_results.csv") {
+  
+  rmse_func <- function(true, est) sqrt(mean((true - est)^2))
+  coverage_func <- function(true, lower, upper) {
+    mean(true >= lower & true <= upper)
+  }
+  
+  result_df <- data.frame()
+
+  for (rep in 1:n_sim) {
+    dat <- generate_data(n, tau_type, mu_type, sigma)
+    X <- model.matrix(~ x1 + x2 + x3 + factor(x4) + factor(x5), data = dat)[, -1]
+    T <- dat$z
+    Y <- dat$y
+    tau_true <- dat$tau
+
+    ps_model <- glm(T ~ X, family = binomial)
+    pihat <- predict(ps_model, type = "response")
+
+    fit.bcf <- tryCatch({
+      bcf(Y, T, X, X, pihat, nburn = 500, nsim = iter)
+    }, error = function(e) {
+      message("BCF failed in rep ", rep)
+      return(NULL)
+    })
+
+    if (!is.null(fit.bcf)) {
+      tau_draws <- fit.bcf$tau  # posterior samples: [nsim, n]
+      tau_hat   <- colMeans(tau_draws)
+
+      # Credible intervals
+      tau_lower <- apply(tau_draws, 2, quantile, probs = 0.025)
+      tau_upper <- apply(tau_draws, 2, quantile, probs = 0.975)
+      int_length <- mean(tau_upper - tau_lower)
+
+      # Metrics
+      rmse_cate <- rmse_func(tau_true, tau_hat)
+      rmse_ate  <- rmse_func(mean(tau_true), mean(tau_hat))
+      coverage  <- coverage_func(tau_true, tau_lower, tau_upper)
+
+      SaveResults <- data.frame(
+        Method = "BCF",
+        rep = rep,
+        n = n,
+        p = 5,
+        tau_setting = tau_type,
+        mu_setting = mu_type,
+        RMSE_CATE = rmse_cate,
+        RMSE_ATE = rmse_ate,
+        Coverage = coverage,
+        Interval_Length = int_length
+      )
+
+      result_df <- rbind(result_df, SaveResults)
+
+      # Save progress after each iteration
+      if (file.exists(results_file)) {
+        write.table(SaveResults, file = results_file, sep = ",", col.names = FALSE, row.names = FALSE, append = TRUE)
+      } else {
+        write.table(SaveResults, file = results_file, sep = ",", col.names = TRUE, row.names = FALSE)
+      }
+    }
+  }
+
+  invisible(result_df)
+}
+```
+
+```{r}
+configs <- expand.grid(
+  tau_type = c("homogeneous", "heterogeneous"),
+  mu_type  = c("linear", "nonlinear"),
+  n        = c(250, 500),
+  stringsAsFactors = FALSE
+)
+```
+
+```{r}
+set.seed(2020)
+results <- list()
+
+for (i in seq_len(nrow(configs))) {
+  config <- configs[i, ]
+  label <- paste0(config$tau_type, "_", config$mu_type, "_n", config$n)
+  cat("Running:", label, "\\n")
+  results[[label]] <- run_simulation(
+    n        = config$n,
+    tau_type = config$tau_type,
+    mu_type  = config$mu_type,
+    sigma    = 0.1,
+    n_sim    = 20,
+    iter     = 800
+  )
+}
+```
+
+
+
+
+
+
