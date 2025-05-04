@@ -18,7 +18,7 @@ When you click the **Knit** button a document will be generated that includes bo
 library(ggplot2)
 library(dplyr)
 library(readr)
-merged_df <- read_csv("~/Desktop/2020_data/Merged_Results_Data.csv") 
+merged_df <- read_csv("~/Desktop/2020_data/Final_Merged_Results.csv") 
 ```
 
 
@@ -194,7 +194,7 @@ p_hist_500 <- ggplot(df_500, aes(x = rmse, fill = Model)) +
   facet_grid(mu_type ~ effect_type) +
   scale_fill_manual(values = model_colors) +
   labs(title = "Histogram of RMSE (ATE) for n = 500",
-       x = "RMSE",
+       x = "RMSE for ATE",
        y = "Count") +
   theme_minimal(base_size = 14) +
   theme(
